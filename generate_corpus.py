@@ -14,7 +14,7 @@ e = 8
 f = 4
 
 # result txt dim, 100 X 7
-m = 100
+m = 50
 n = 8
 
 # label dim 

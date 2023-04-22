@@ -1,72 +1,97 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
-import data
+hard_features_map = {
+    "男": [1.0, 0.0],
+    "女": [0.0, 1.0],
+    "23": [1.0, 0.0, 0.0, 0.0],
+    "30": [0.0, 1.0, 0.0, 0.0],
+    "35": [0.0, 0.0, 1.0, 0.0],
+    "45": [0.0, 0.0, 0.0, 1.0],
+    "中专": [1.0, 0.0, 0.0, 0.0],
+    "大专": [0.0, 1.0, 0.0, 0.0],
+    "本科": [0.0, 0.0, 1.0, 0.0],
+    "硕士": [0.0, 0.0, 0.0, 1.0],
+    "计算机": [1.0, 0.0, 0.0, 0.0],
+    "物流管理": [0.0, 1.0, 0.0, 0.0],
+    "市场营销": [0.0, 0.0, 1.0, 0.0],
+    "临床医学": [0.0, 0.0, 0.0, 1.0],
+    "1年": [1.0, 0.0, 0.0, 0.0],
+    "3年": [0.0, 1.0, 0.0, 0.0],
+    "5年": [0.0, 0.0, 1.0, 0.0],
+    "7年": [0.0, 0.0, 0.0, 1.0],
+    "苏州": [1.0, 0.0, 0.0, 0.0],
+    "天津": [0.0, 1.0, 0.0, 0.0],
+    "杭州": [0.0, 0.0, 1.0, 0.0],
+    "武汉": [0.0, 0.0, 0.0, 1.0],
+    "3000": [1.0, 0.0, 0.0, 0.0],
+    "5000": [0.0, 1.0, 0.0, 0.0],
+    "10000": [0.0, 0.0, 1.0, 0.0],
+    "15000": [0.0, 0.0, 0.0, 1.0],
+    "软件工程师": [1.0, 0.0, 0.0, 0.0],
+    "快递员": [0.0, 1.0, 0.0, 0.0],
+    "销售": [0.0, 0.0, 1.0, 0.0],
+    "医生": [0.0, 0.0, 0.0, 1.0]
+}
 
-# 输入shape
-m = 100
-n = 8
+# batch size
+m = 50
+# features 26维
+n = 26
+# labels 4维
+p = 4
 
-# 定义神经网络模型
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(7, 64)  # 输入层到隐层1
-        self.fc2 = nn.Linear(64, 128)  # 隐层1到隐层2
-        self.fc3 = nn.Linear(128, 1)   # 隐层2到输出层
-        self.relu = nn.ReLU()           # ReLU激活函数
+epoches = 100000
+features = list()
+x_train = list()
 
-    def forward(self, x):
-        x = self.relu(self.fc1(x))      # 第一层全连接 + 激活
-        x = self.relu(self.fc2(x))      # 第二层全连接 + 激活
-        x = self.fc3(x)                 # 输出层全连接
-        return x
+labels = list()
 
-def batchify(data):
-    return data.view(m, n)
+i = 0
+with open("./data/train.txt") as f:
+    for line in f:
+        for word in line.strip().split(",")[:-1]:
+            # print(hard_features_map[word])
+            x_train.extend(hard_features_map[word])
+            # print(x_train)
+        # print(len(x_train))
+        if i == 10:
+            print(x_train)
+        features.append(x_train)
+        x_train = []
+        i += 1
 
-corpus = data.Corpus("./data")
+# print(features)
 
-# 分离训练，特征和标签
-x, y = torch.split(batchify(corpus.train), [7, 1], dim=1)
-y = y.view(-1)
-print(x)
-print(y)
+with open("./data/train.txt") as f:
+    for line in f:
+        labels.append(hard_features_map[line.strip().split(",")[-1]])
 
 
+# print(labels)
 
-# 加载数据集
-train_set = torch.utils.data.TensorDataset(x, y)
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=16, shuffle=True)
+x_train = torch.Tensor(features)
+y_train = torch.Tensor(labels)
 
-# 初始化模型和损失函数
-net = Net()
-criterion = nn.CrossEntropyLoss()
+model = torch.nn.Sequential(
+    torch.nn.Linear(26, 64),
+    torch.nn.ReLU(),
+    torch.nn.Linear(64, 4),
+    torch.nn.Softmax(dim=1)
+)
 
-# 使用随机梯度下降进行优化
-optimizer = optim.SGD(net.parameters(), lr=0.02)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+loss_fn = torch.nn.MSELoss()
 
-# 训练模型
-for epoch in range(20): # 进行 10 次迭代
-    running_loss = 0.0
-    for i, data in enumerate(train_loader, 0):
-        inputs, labels = data
-        optimizer.zero_grad() # 梯度清零
-        outputs = net(inputs) # 前向传播
-        loss = criterion(outputs.view(-1), labels) # 计算损失
-        loss.backward()       # 反向传播
-        optimizer.step()      # 更新参数
-        running_loss += loss.item()
-        if i % 9 == 0:    # 每 10 批次打印一次损失值
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2))
-            running_loss = 0.0
+for epoch in range(epoches):
+    optimizer.zero_grad()
+    y_pred = model(x_train)
+    loss = loss_fn(y_pred, y_train)
+    loss.backward()
+    optimizer.step()
+    if (epoch + 1) % 1000 == 0:
+        print('Epoch [{}/{}], Loss;{:.4f}'.format(epoch + 1, epoches, loss.item()))
 
-print('Finished Training')
-
-# # 推理测试
-# test_inputs = torch.tensor([[0., 2., 4., 6., 8., 10., 12.]])
-# with torch.no_grad():
-#     test_outputs = net(test_inputs)
-# _, predicted =
+x_test = torch.tensor([[0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]])
+with torch.no_grad():
+    y_pred = model(x_test)
+    print('预测结果: ', y_pred.detach().numpy())
